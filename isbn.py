@@ -224,36 +224,33 @@ def resolve(raw_isbn: str | None, raw_isbn13: str | None) -> Resolved:
     if r13:
         out.warnings["isbn13"] = list(r13)
 
-    mismatch = False
     if moved:
         if v13 and v13 != moved:
-            mismatch = True
+            # isbn13 already holds a different valid ISBN-13, so there is nowhere to move this one:
+            # a 13-digit value in the ISBN-10 column is the wrong length (matches partner's build).
+            _add(out.warnings, "isbn", BAD_LENGTH)
         else:
             if not v13:
                 out.repairs.append(Repair("isbn13", ISBN13_MOVED_FROM_ISBN, raw_isbn, moved))
                 _drop(out.warnings, "isbn13", LOST_PRECISION)
             v13 = moved
-    elif v10 and v13 and isbn10_to_isbn13(v10) != v13:
-        mismatch = True
+    # Two valid ISBNs that disagree are both kept, with no warning: rules.md has no rule for this
+    # case, and this matches the partner's build (agreed 2026-11-09 to make the databases match).
 
-    if mismatch:
-        _add(out.warnings, "isbn", ISBN_MISMATCH)
-        _add(out.warnings, "isbn13", ISBN_MISMATCH)
-        out.repairs = []
-        v10 = v13 = None
-    else:
-        if v10 and not v13:
-            v13 = isbn10_to_isbn13(v10)
-            out.repairs.append(Repair("isbn13", ISBN13_DERIVED_FROM_ISBN, raw_isbn13 or "", v13))
-            if is_float_form(raw_isbn13):
-                # rules-final.md section 1: an isbn13 stored as scientific notation / float, with a valid
-                # isbn, is a repair - whatever else is wrong with the float value (e.g. lost digits, length).
-                out.warnings.pop("isbn13", None)
-        if v13 and not v10 and v13.startswith("978"):
-            v10 = isbn13_to_isbn10(v13)
-            out.repairs.append(Repair("isbn", ISBN_DERIVED_FROM_ISBN13, raw_isbn or "", v10))
+    if v10 and not v13:
+        v13 = isbn10_to_isbn13(v10)
+        out.repairs.append(Repair("isbn13", ISBN13_DERIVED_FROM_ISBN, raw_isbn13 or "", v13))
+        if is_float_form(raw_isbn13):
+            # rules-final.md section 1: an isbn13 stored as scientific notation / float, with a valid
+            # isbn, is a repair - whatever else is wrong with the float value (e.g. lost digits, length).
+            out.warnings.pop("isbn13", None)
+    if v13 and not v10 and v13.startswith("978"):
+        v10 = isbn13_to_isbn10(v13)
+        out.repairs.append(Repair("isbn", ISBN_DERIVED_FROM_ISBN13, raw_isbn or "", v10))
 
-    if not v10 and not v13:
+    if not (raw_isbn or "").strip() and not (raw_isbn13 or "").strip():
+        # rules.md section 1: "Both isbn and isbn13 blank" -> no-usable-isbn. Only when both raw
+        # columns were blank, as the rule is worded (matches partner's build).
         _add(out.warnings, "isbn13", NO_USABLE_ISBN)
     out.isbn, out.isbn13 = v10, v13
     return out

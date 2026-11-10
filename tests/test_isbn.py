@@ -87,22 +87,22 @@ class Section1(unittest.TestCase):
     def test_lost_digits_with_no_isbn(self):
         res = resolve("", "9.78043902348e+12")
         self.assertEqual((res.isbn, res.isbn13), (None, None))
-        self.assertEqual(res.warnings["isbn13"], ["lost-precision", "no-usable-isbn"])
+        self.assertEqual(res.warnings["isbn13"], ["lost-precision"])
 
     def test_nook_code_lists_every_reason(self):
         res = resolve("", "2.94000000063e+12")
-        self.assertEqual(res.warnings["isbn13"], ["lost-precision", "bad-prefix", "no-usable-isbn"])
+        self.assertEqual(res.warnings["isbn13"], ["lost-precision", "bad-prefix"])
 
     def test_wrong_check_digit(self):
         res = resolve("0439023484", "")
         self.assertEqual(res.warnings["isbn"], ["bad-checksum"])
-        self.assertEqual(resolve("", "9780439023482").warnings["isbn13"], ["bad-checksum", "no-usable-isbn"])
+        self.assertEqual(resolve("", "9780439023482").warnings["isbn13"], ["bad-checksum"])
 
     def test_invalid_characters(self):
         self.assertEqual(resolve("04390A3483", "").warnings["isbn"], ["bad-characters"])
 
     def test_wrong_length(self):
-        self.assertEqual(resolve("", "97893806587").warnings["isbn13"], ["bad-length", "no-usable-isbn"])
+        self.assertEqual(resolve("", "97893806587").warnings["isbn13"], ["bad-length"])
         res = resolve(HG10, "978043902348")                 # not a float: warned, then filled from isbn
         self.assertEqual(res.warnings["isbn13"], ["bad-length"])
         self.assertEqual(res.isbn13, HG13)
@@ -124,7 +124,7 @@ class Section1(unittest.TestCase):
 
     def test_prefix_check(self):
         bad = full13("123456789012")                      # valid Mod-10, wrong prefix
-        self.assertEqual(resolve("", bad).warnings["isbn13"], ["bad-prefix", "no-usable-isbn"])
+        self.assertEqual(resolve("", bad).warnings["isbn13"], ["bad-prefix"])
         both = "1234567890123"
         self.assertEqual(resolve("", both).warnings["isbn13"][:2], ["bad-prefix", "bad-checksum"])
 
@@ -138,12 +138,17 @@ class Section1(unittest.TestCase):
         self.assertEqual(resolve(None, None).warnings, {"isbn13": ["no-usable-isbn"]})
 
     def test_unparseable(self):
-        self.assertEqual(resolve("n/a", "???").warnings, {"isbn": ["unparseable"], "isbn13": ["unparseable", "no-usable-isbn"]})
+        self.assertEqual(resolve("n/a", "???").warnings, {"isbn": ["unparseable"], "isbn13": ["unparseable"]})
 
     def test_columns_disagree(self):
+        # Two valid ISBNs that disagree are both kept, with no warning (rules.md has no rule for this;
+        # changed 2026-11-09 to match the partner's build).
         res = resolve(HG10, HP13)
-        self.assertEqual((res.isbn, res.isbn13), (None, None))
-        self.assertEqual(res.warnings, {"isbn": ["isbn-mismatch"], "isbn13": ["isbn-mismatch", "no-usable-isbn"]})
+        self.assertEqual((res.isbn, res.isbn13), (HG10, HP13))
+        self.assertEqual(res.warnings, {})
+        # An ISBN-13 in the isbn column that disagrees with isbn13 can't be moved: isbn is warned bad-length.
+        res = resolve(HP13, HG13)
+        self.assertEqual((res.isbn13, res.warnings.get("isbn")), (HG13, ["bad-length"]))
 
 
 if __name__ == "__main__":

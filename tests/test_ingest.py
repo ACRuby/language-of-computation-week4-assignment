@@ -98,10 +98,10 @@ class Loading(IngestTestCase):
         self.assertEqual(e["counts"]["loaded_with_warning"], 1)
         w = self.query("SELECT * FROM warnings")
         self.assertEqual([(x["field"], x["raw_value"], x["reason"]) for x in w],
-                         [("isbn13", "9.78043902348e+12", "lost-precision,no-usable-isbn")])
+                         [("isbn13", "9.78043902348e+12", "lost-precision")])
         self.assertEqual(w[0]["book_row_id"], self.query("SELECT id FROM books")[0]["id"])
         self.assertIsNone(self.query("SELECT isbn13 FROM books")[0]["isbn13"])
-        self.assertEqual(e["problem_counts"], {"no-usable-isbn": 1, "lost-precision": 1})
+        self.assertEqual(e["problem_counts"], {"lost-precision": 1})
 
     def test_other_fields_passed_through_without_validation(self):
         e = self.run_file(self.write([book("1", isbn=HG10, title="", authors="", original_publication_year="-500.0",
